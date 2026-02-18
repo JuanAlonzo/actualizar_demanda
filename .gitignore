@@ -1,0 +1,35 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+dist/
+build/
+*.egg-info/
+*.egg
+
+# Entorno virtual
+venv/
+env/
+.venv/
+
+# Directorio de logs y reportes
+logs/
+reportes/
+*.log
+*.csv
+
+# Visual Studio Code
+.vscode/
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Archivos temporales
+*.tmp
+tmp/
+
+# Archivos de configuración
+*.json
