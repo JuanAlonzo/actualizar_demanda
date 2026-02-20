@@ -1,6 +1,5 @@
 import math
 from tqdm import tqdm
-from tqdm.contrib.logging import logging_redirect_tqdm
 from core.config import DRY_RUN
 from core.cliente_acad import ClienteAutoCAD
 from core.logica_texto import normalizar_tipo, normalizar_terreno, analizar_combinacion
@@ -17,6 +16,7 @@ def main():
     # Conexión e Inicialización
     try:
         cad = ClienteAutoCAD()
+        print(f"Conexión exitosa a: {cad.doc.Name}.")
         logger.info(f"Conexión exitosa a: {cad.doc.Name}.")
     except Exception as e:
         logger.critical(f"Error fatal: {e}")
@@ -34,15 +34,15 @@ def main():
         textos = cad.obtener_textos()
         logger.info(f"ℹ Se encontraron {len(textos)} textos en el modelo.")
 
-        with logging_redirect_tqdm():
+        with tqdm(
+            textos,
+            desc="Procesando",
+            unit="txt",
+            colour="green",
+            dynamic_ncols=True,
+        ) as pbar:
             # 4. Bucle Principal de Procesamiento
-            for obj in tqdm(
-                textos,
-                desc="Procesando",
-                unit="txt",
-                colour="green",
-                dynamic_ncols=True,
-            ):
+            for obj in pbar:
                 try:
                     # Extraer datos básicos
                     texto_original = obj.TextString
@@ -51,7 +51,7 @@ def main():
 
                     stats["procesados"] += 1
 
-                    # --- CASO 1: Combinaciones (Ej: "R/C") ---
+                    # CASO 1: Combinaciones (Ej: "R/C")
                     if "/" in texto_upper:
                         resultado = analizar_combinacion(texto_upper)
 
@@ -60,6 +60,7 @@ def main():
                             logger.info(
                                 f"🔄 Separando: '{texto_original}' -> {nuevos_txt}"
                             )
+                            pbar.set_postfix_str(f"Separado: {texto_original}")
 
                             if not DRY_RUN:
                                 origen = obj.InsertionPoint
@@ -84,6 +85,7 @@ def main():
 
                             stats["separados"] += 1
 
+                    # Caso 2: Textos Simples (Ej: "2R", "C", "TC")
                     elif any(x in texto_upper for x in ["R", "C", "T", "TC"]):
                         nuevo_texto = texto_upper
 
@@ -99,10 +101,13 @@ def main():
                         if nuevo_texto != texto_upper:
                             if not DRY_RUN:
                                 obj.TextString = nuevo_texto
+
                             logger.info(
                                 f"✏️ Normalizado: '{texto_original}' -> '{nuevo_texto}'"
                             )
+                            pbar.set_postfix_str(f"Normalizado: {nuevo_texto}")
                             stats["modificados"] += 1
+
                 except Exception as e_obj:
                     logger.warning(
                         f"Error procesando objeto ID {getattr(obj, 'Handle', '?')}: {e_obj}"
@@ -118,14 +123,20 @@ def main():
             cad.terminar_undo()
 
         # Reporte Final
-        logger.info("\n" + "=" * 30)
-        logger.info("RESUMEN FINAL")
-        logger.info("=" * 30)
-        logger.info(f"Total Procesados:  {stats['procesados']}")
-        logger.info(f"Separados (R/C):   {stats['separados']}")
-        logger.info(f"Modificados (Txt): {stats['modificados']}")
-        logger.info(f"Errores:           {stats['errores']}")
-        logger.info("=" * 30)
+        resumen = (
+            f"\n{'=' * 30}\n"
+            f"RESUMEN FINAL\n"
+            f"{'=' * 30}\n"
+            f"Total Procesados:  {stats['procesados']}\n"
+            f"Separados (R/C):   {stats['separados']}\n"
+            f"Modificados (Txt): {stats['modificados']}\n"
+            f"Errores:           {stats['errores']}\n"
+            f"{'=' * 30}"
+        )
+        print(resumen)
+        logger.info(resumen)
+
+        input("Finalizado. Presione Enter para salir...")
 
 
 if __name__ == "__main__":

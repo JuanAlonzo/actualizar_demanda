@@ -46,8 +46,6 @@ def analizar_combinacion(texto: str) -> Optional[List[Tuple[str, float]]]:
 
     resultado = []
 
-    # --- Lógica de detección (Portado de update_demand.py) ---
-
     # Analizar primera parte (Posición 0)
     if "R" in p1 and "C" not in p1:
         resultado.append((normalizar_tipo(p1, "R"), 0.0))

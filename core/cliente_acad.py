@@ -27,25 +27,57 @@ class ClienteAutoCAD:
     def terminar_undo(self):
         self.doc.EndUndoMark()
 
-    def obtener_textos(self) -> List[Any]:
-        """
-        Devuelve una lista de objetos de texto usando un SelectionSet filtrado.
-        Mucho más rápido que iterar todo el ModelSpace.
-        """
-        objetos_texto = []
-        total = self.model.Count
+    def crear_filtro_dxf(self, codigos: List[int], valores: List[Any]):
+        """Crea un filtro DFX para selección rápida."""
+        vt_i2 = pythoncom.VT_ARRAY | pythoncom.VT_I2
+        vt_variant = pythoncom.VT_ARRAY | pythoncom.VT_VARIANT
 
-        # Iteramos manualmente
-        for i in range(total):
-            try:
-                item = self.model.Item(i)
-                # Filtramos aquí en Python, no en AutoCAD
-                if item.EntityName == "AcDbText":
-                    objetos_texto.append(item)
-            except Exception:
-                continue
+        filtro_cod = win32com.client.VARIANT(vt_i2, codigos)
+        filtro_val = win32com.client.VARIANT(vt_variant, valores)
+        return filtro_cod, filtro_val
 
-        return objetos_texto
+    def obtener_textos(self, capas_activas: set = None) -> List[Any]:
+        """
+        Obtiene textos usando SelectionSets nativos para máxima velocidad.
+        """
+        capas_activas = set()
+        try:
+            for i in range(self.doc.Layers.Count):
+                capa = self.doc.Layers.Item(i)
+                if capa.LayerOn and not capa.Freeze:
+                    capas_activas.add(capa.Name)
+            logger.debug(f"Capas activas: {capas_activas}")
+        except Exception as e:
+            logger.warning(f"No se pudieron obtener capas: {e}")
+
+        nombre_ss = "SS_TEXTOS_PYTHON"
+
+        try:
+            self.doc.SelectionSets.Item(nombre_ss).Delete()
+        except Exception:
+            pass
+
+        ss = self.doc.SelectionSets.Add(nombre_ss)
+
+        codigos = [0]
+        valores = ["Text"]
+
+        if capas_activas:
+            codigos.append(8)
+            valores.append(",".join(capas_activas))
+
+        f_cod, f_val = self.crear_filtro_dxf(codigos, valores)
+
+        try:
+            ss.Select(5, None, None, f_cod, f_val)
+            objetos = [ss.Item(i) for i in range(ss.Count)]
+        except Exception as e:
+            logger.error(f"Error en SelectionSet: {e}")
+            objetos = []
+        finally:
+            ss.Delete()
+
+        return objetos
 
     def crear_texto(
         self,
